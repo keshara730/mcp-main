@@ -5,19 +5,51 @@
 //include this .c file's header file
 #include "Robot.h"
 
-//static function prototypes, functions only called in this file
+volatile uint8_t button_pressed = 0;
+
+ISR(INT2_vect) {
+    button_pressed = 1;
+}
+
+void init_interrupt() {
+    // Set INT2 as input
+    DDRD &= ~(1 << DD2);
+    
+    // Trigger on falling edge (ISC21=1, ISC20=0)
+    EICRA |= (1 << ISC21);
+    EICRA &= ~(1 << ISC20);
+    
+    // Enable INT2
+    EIMSK |= (1 << INT2);
+    
+    // Enable global interrupts
+    sei();
+}
 
 int main(void)
 {
-  DDRA = 0xFF;//put PORTA into output mode
-  PORTA = 0; 
-  while(1)//main loop
+  serial0_init();
+  adc_init();
+  init_interrupt();
+  _delay_ms(20);
+
+  char buffer[32];
+
+ // cli();
+ // EICRA |= (1<<ISC21);
+ // EIMSK |= (1<<INT2);
+ // DDRD  &= ~(1 << DD2);   // set PD2 as input
+// PORTD |=  (1 << PD2);   // enable internal pull-up
+ // sei();
+
+  while(1) //main loop
   {
-    _delay_ms(500);     //500 millisecond delay
-    PORTA |= (1<<PA2);  // note here PA3 is just an alias for the number 3
-                        // this line is equivalent to PORTA = PORTA | 0b00001000   which writes a HIGH to pin 3 of PORTA
-    _delay_ms(500); 
-    PORTA &= ~(1<<PA2); // this line is equivalent to PORTA = PORTA & (0b11110111)  which writes a HIGH to pin 3 of PORTA
+    if (button_pressed) {
+      uint16_t light = adc_read(0);  
+      sprintf(buffer, "\nLight level: %d/1023\n", light);
+      serial0_print_string(buffer);
+      button_pressed = 0;  // reset the flag
+    }
   }
   return(1);
 }//end main 
